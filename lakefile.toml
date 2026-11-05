@@ -1,0 +1,10 @@
+name = "psdsl"
+version = "0.1.0"
+defaultTargets = ["psdsl"]
+
+[[lean_lib]]
+name = "PsDsl"
+
+[[lean_exe]]
+name = "psdsl"
+root = "Main"
