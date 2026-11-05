@@ -1,0 +1,37 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Lean toolchain
+        shell: pwsh
+        run: |
+          Invoke-WebRequest https://elan.lean-lang.org/elan-init.ps1 -OutFile elan-init.ps1
+          ./elan-init.ps1 -NoPrompt 1 -DefaultToolchain (Get-Content lean-toolchain).Trim()
+          "$env:USERPROFILE\.elan\bin" | Out-File -Append -Encoding ascii $env:GITHUB_PATH
+
+      - name: Build
+        shell: pwsh
+        run: lake build
+
+      - name: Package
+        shell: pwsh
+        run: |
+          Copy-Item .lake\build\bin\psdsl.exe psdsl-windows-x64.exe
+          (Get-FileHash psdsl-windows-x64.exe -Algorithm SHA256).Hash.ToLower() + "  psdsl-windows-x64.exe" | Out-File -Encoding ascii psdsl-windows-x64.exe.sha256
+
+      - name: Publish release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "${{ github.ref_name }}" psdsl-windows-x64.exe psdsl-windows-x64.exe.sha256 --generate-notes

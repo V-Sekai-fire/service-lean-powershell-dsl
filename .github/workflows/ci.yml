@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Lean toolchain
+        shell: pwsh
+        run: |
+          Invoke-WebRequest https://elan.lean-lang.org/elan-init.ps1 -OutFile elan-init.ps1
+          ./elan-init.ps1 -NoPrompt 1 -DefaultToolchain (Get-Content lean-toolchain).Trim()
+          "$env:USERPROFILE\.elan\bin" | Out-File -Append -Encoding ascii $env:GITHUB_PATH
+
+      - name: Build
+        shell: pwsh
+        run: lake build
+
+      - name: Smoke tests
+        shell: pwsh
+        run: |
+          $exe = ".lake\build\bin\psdsl.exe"
+          $ErrorActionPreference = 'Stop'
+
+          if ((& $exe quote "it's `$x") -ne "'it''s `$x'") { throw 'quote failed' }
+
+          # Generated script must parse
+          $script = (& $exe example) -join "`n"
+          $errors = $null; $tokens = $null
+          [void][Management.Automation.Language.Parser]::ParseInput($script, [ref]$tokens, [ref]$errors)
+          if ($errors.Count) { throw "example script has parse errors: $errors" }
+
+          # File edit: wrong count fails and leaves file intact; right count succeeds
+          $f = Join-Path $env:RUNNER_TEMP 'psdsl-t.txt'
+          [IO.File]::WriteAllText($f, "a 327680 b 327680`n")
+          & $exe file-replace --path $f --pattern 327680 --replace 262144 --run 2>$null
+          if ($LASTEXITCODE -eq 0) { throw 'mismatched count should fail' }
+          if ((Get-Content $f -Raw).Trim() -ne 'a 327680 b 327680') { throw 'file changed despite failure' }
+          & $exe file-replace --path $f --pattern 327680 --replace 262144 --expect 2 --run
+          if ($LASTEXITCODE -ne 0) { throw 'expected success' }
+          if ((Get-Content $f -Raw).Trim() -ne 'a 262144 b 262144') { throw 'unexpected file content' }
+
+          # Registry edit with empty replacement
+          $k = 'HKCU:\Software\psdsl-ci'
+          New-Item $k -Force | Out-Null
+          Set-ItemProperty $k -Name P -Value 'x --rope-yarn y'
+          & $exe reg-rewrite --key $k --name P --pattern '--rope-yarn\s*' --replace= --run
+          if ((Get-ItemProperty $k).P -ne 'x y') { throw 'registry rewrite failed' }
+          Remove-Item $k -Recurse
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: psdsl-windows-x64
+          path: .lake/build/bin/psdsl.exe

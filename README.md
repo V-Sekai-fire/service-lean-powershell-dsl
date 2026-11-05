@@ -1,6 +1,8 @@
-# psdsl
+# psdsl: Lean PowerShell DSL
 
-A small Lean 4 CLI that generates safe PowerShell from typed edits, so you never fight shell quoting again.
+[![CI](https://github.com/V-Sekai-fire/service-lean-powershell-dsl/actions/workflows/ci.yml/badge.svg)](https://github.com/V-Sekai-fire/service-lean-powershell-dsl/actions/workflows/ci.yml)
+
+A small Lean 4 DSL and CLI (`psdsl`) that generates safe PowerShell from typed edits, so you never fight shell quoting again. Useful for scripted Windows registry, file and service-configuration changes, including elevated runs through `gsudo`.
 
 ## Why
 
@@ -35,3 +37,5 @@ Use `--opt=VALUE` to pass an empty value (`--replace=`): PowerShell drops empty 
 
 - `PsDsl.lean`: the DSL (`Expr`, `Stmt`, renderer, `rewriteReg`, `replaceInFile`).
 - `Main.lean`: the CLI.
+- `.github/workflows/ci.yml`: build and smoke tests on Windows for every push and PR.
+- `.github/workflows/release.yml`: pushing a `v*` tag publishes `psdsl-windows-x64.exe` and a SHA-256 file.
